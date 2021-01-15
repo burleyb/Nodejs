@@ -12,7 +12,7 @@ module.exports = function (configure) {
 	return {
 		validate: function () {},
 		stream: function (suffix) {
-			let eventName = "queue:dw.load" + (suffix ? suffix : "");
+			let eventName = "dw.load" + (suffix ? suffix : "");
 			return ls.through((obj, done) => {
 				if (!obj.payload){
 					obj = {payload:obj};

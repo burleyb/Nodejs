@@ -14,7 +14,7 @@ describe("local", function () {
 			debug: true
 		});
 		leo.streams.pipe(
-			leo.read("ckz_manual_checkpoint", "queue:CZ_Starwars_out"),
+			leo.read("ckz_manual_checkpoint", "CZ_Starwars_out"),
 			cp,
 			(err) => {
 				console.log("All Done processing events", err);
