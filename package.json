@@ -13,6 +13,7 @@
 	},
 	"dependencies": {
 		"async": "2.6.2",
+		"aws-sdk": "^2.828.0",
 		"backoff": "2.5.0",
 		"event-stream": "4.0.1",
 		"extend": "3.0.2",
