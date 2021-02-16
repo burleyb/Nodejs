@@ -45,11 +45,12 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			let partition = Math.abs(hashCode(eventPartition(obj))) % cronData.icount;
 			logger.log("[partition]", partition, "[iid]", cronData.iid, "[eid]", obj.eid, "[icount]", cronData.icount);
 			if (partition == cronData.iid) {
-				logger.log("------ PROCESSING: matched on partition ------");
+				logger.log("------ PROCESSING: matched on partition ------", obj.eid);
 				done(null, obj);
 			} else {
-				logger.log("------ NOT PROCESSING: no match on partition ------");
-				done(null, true);
+				logger.log("------ NOT PROCESSING: no match on partition ------", obj.eid);
+				obj.payload = {"skip": true }
+				done(null, obj);
 			}
 		}));
 		stream.checkpoint = reader.checkpoint;
@@ -351,7 +352,7 @@ function reduceCheckpoints(responses) {
 					agg.checkpoints[botId] = curr.checkpoints[botId];
 					Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
 						agg.checkpoints[botId].read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-						agg.checkpoints[botId].read[queue].records = curr.checkpoints[botId].read[queue].records || 1;
+						// agg.checkpoints[botId].read[queue].records = curr.checkpoints[botId].read[queue].records || 1;
 					});
 				} else {
 					let checkpointData = agg.checkpoints[botId].read;
@@ -359,16 +360,16 @@ function reduceCheckpoints(responses) {
 						if (!(queue in checkpointData)) {
 							checkpointData[queue] = curr.checkpoints[botId].read[queue];
 							checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-							checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
+							// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
 						} else {
 							let minCheckpoint = min(checkpointData[queue].checkpoint, curr.checkpoints[botId].read[queue].checkpoint);
-							checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
-							let curr_count = checkpointData[queue].records
+							// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
+							// let curr_count = checkpointData[queue].records
 							if (minCheckpoint && minCheckpoint == curr.checkpoints[botId].read[queue].checkpoint) {
 								checkpointData[queue] = curr.checkpoints[botId].read[queue];
 								checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
 								agg.checkpoints[botId].read = checkpointData;
-								checkpointData[queue].records = curr_count
+								// checkpointData[queue].records = curr_count
 							}
 						}
 					});
