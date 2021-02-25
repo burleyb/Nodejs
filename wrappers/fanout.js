@@ -178,11 +178,19 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 									data: data,
 									iid: 0
 								});
+							} else {
+								logger.log(`Already called instance 1/${instances}`);
 							}
 						};
 						const handlerResponse = handler(event, context, handlerCallback);
 						if (handlerResponse && typeof handlerResponse.then === 'function') {
-							handlerResponse.then((data) => handlerCallback(null, data)).catch(err=> handlerCallback(err));
+							handlerResponse
+							.then(
+								data => handlerCallback(null, data)
+							)
+							.catch(
+								err=> handlerCallback(err)
+							);
 						}
 						return handlerResponse;
 					}, 200);
@@ -194,8 +202,12 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 
 			// Wait for all workers to return and figure out what checkpoint to persist
 			logger.debug(`Waiting on all Fanout workers: count ${workers.length}`);
-			Promise.all(workers).then(callCheckpointOnResponses(leoBotCheckpoint, callback)).catch((err) => { 
-				logger.error("[err]", err);
+			Promise.all(workers)
+			.then(
+				callCheckpointOnResponses(leoBotCheckpoint, callback)
+			)
+			.catch((err) => { 
+				logger.error("[err in promise all]", err);
 				return callback(err);
 			});
 		}
@@ -256,7 +268,8 @@ function invokeSelf(event, iid, count, context) {
 	let newEvent = {
 		__cron: {
 			iid,
-			icount: count
+			icount: count,
+			invokeTime: moment.utc()
 		}
 	};
 	try {
@@ -292,6 +305,8 @@ function invokeSelf(event, iid, count, context) {
 							return reject(err);
 						} else if (!err && data.Payload != undefined && data.Payload != 'null') {
 							data = JSON.parse(data.Payload);
+						} else {
+							logger.log("------- unexpected response from child lambda ------", data)
 						}
 		
 						resolve(data);
@@ -342,40 +357,47 @@ function invokeSelf(event, iid, count, context) {
  */
 function reduceCheckpoints(responses) {
 	logger.log("[responses]", JSON.stringify(responses, null, 2));
+	var allReported = true
 	let checkpoints = responses.reduce((agg, curr) => {
 		if (curr && curr.error) {
 			agg.errors.push(curr.error);
 		}
 		if(curr && curr.checkpoints) {
-			Object.keys(curr.checkpoints).map(botId => {
-				if (!(botId in agg.checkpoints)) {
-					agg.checkpoints[botId] = curr.checkpoints[botId];
-					Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
-						agg.checkpoints[botId].read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-						// agg.checkpoints[botId].read[queue].records = curr.checkpoints[botId].read[queue].records || 1;
-					});
-				} else {
-					let checkpointData = agg.checkpoints[botId].read;
-					Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
-						if (!(queue in checkpointData)) {
-							checkpointData[queue] = curr.checkpoints[botId].read[queue];
-							checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-							// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
-						} else {
-							let minCheckpoint = min(checkpointData[queue].checkpoint, curr.checkpoints[botId].read[queue].checkpoint);
-							// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
-							// let curr_count = checkpointData[queue].records
-							if (minCheckpoint && minCheckpoint == curr.checkpoints[botId].read[queue].checkpoint) {
+			if(Object.keys(curr.checkpoints).length) {
+				Object.keys(curr.checkpoints).map(botId => {
+					if(!agg.checkpoints) {
+						
+					} else if (!(botId in agg.checkpoints)) {
+						agg.checkpoints[botId] = curr.checkpoints[botId];
+						Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
+							agg.checkpoints[botId].read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
+							// agg.checkpoints[botId].read[queue].records = curr.checkpoints[botId].read[queue].records || 1;
+						});
+					} else {
+						let checkpointData = agg.checkpoints[botId].read;
+						Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
+							if (!(queue in checkpointData)) {
 								checkpointData[queue] = curr.checkpoints[botId].read[queue];
 								checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-								agg.checkpoints[botId].read = checkpointData;
-								// checkpointData[queue].records = curr_count
+								// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
+							} else {
+								let minCheckpoint = min(checkpointData[queue].checkpoint, curr.checkpoints[botId].read[queue].checkpoint);
+								// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
+								// let curr_count = checkpointData[queue].records
+								if (minCheckpoint && minCheckpoint == curr.checkpoints[botId].read[queue].checkpoint) {
+									checkpointData[queue] = curr.checkpoints[botId].read[queue];
+									checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
+									agg.checkpoints[botId].read = checkpointData;
+									// checkpointData[queue].records = curr_count
+								}
 							}
-						}
-					});
-				}
-				
-			});
+						});
+					}
+					
+				});
+			} else {
+				allReported = false
+			}
 		}
 		return agg;
 	}, {
@@ -390,9 +412,10 @@ function reduceCheckpoints(responses) {
 	}
 	let vals = Object.values(checkpoints);
 	
-	if(vals) {
+	if(vals && allReported) {
 		return Object.values(vals);
 	} else {
+		logger.log("----- not all have reported, cannot checkpoint unless all children have processes the same events -----")
 		return [];
 	}
 }
