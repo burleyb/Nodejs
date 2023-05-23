@@ -16,6 +16,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 		instances: 2,
 		allowCheckpoint: false
 	}, opts);
+	let process_count = 0
 
 	//logger.log("Fanout start");
 	eventPartition = eventPartition || (event => event.eid);
@@ -46,6 +47,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			logger.log("[partition]", partition, "[iid]", cronData.iid, "[eid]", obj.eid, "[icount]", cronData.icount);
 			if (partition == cronData.iid) {
 				logger.log("------ PROCESSING: matched on partition ------", obj.eid);
+				process_count++
 				done(null, obj);
 			} else {
 				logger.log("------ NOT PROCESSING: no match on partition ------", obj.eid);
@@ -82,7 +84,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			botData[event].source_timestamp = params.source_timestamp;
 			botData[event].started_timestamp = params.started_timestamp;
 			botData[event].ended_timestamp = params.ended_timestamp;
-			logger.log(`Checkpoint Wrapper. Bot: ${id}:${cronData.iid}, Queue: ${event}, data: ${JSON.stringify(params)}`);
+			logger.log(`Checkpoint Wrapper. Bot: ${id}:${cronData.iid}, Queue: ${event}, data: ${JSON.stringify(params)}, count: ${process_count}`);
 			done();
 		};
 	}
@@ -109,7 +111,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 	};
 
 
-	logger.log("Fanout Return", process.env.FANOUT_iid, process.env.FANOUT_icount, process.env.FANOUT_maxeid);
+	logger.log("Fanout Return", process.env.FANOUT_iid, process.env.FANOUT_icount, process.env.FANOUT_maxeid, 'Count: '+process_count);
 	return (event, context, callback) => {
 
 		cronData = event.__cron || {};
@@ -161,7 +163,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			if (typeof instances === "function") {
 				instances = instances(event, cronData);
 			}
-			instances = Math.max(1, Math.min(instances, opts.maxInstances || 20));
+			instances = Math.max(1, Math.min(instances, opts.maxInstances));
 			cronData.icount = instances;
 			let workers = [
 				new Promise(resolve => {

@@ -6,6 +6,7 @@ let LeoConfiguration = require("./lib/configuration.js");
 let aws = require("./lib/leo-aws");
 const fs = require("fs");
 const ini = require('ini');
+var https = require("https");
 const execSync = require("child_process").execSync;
 
 function SDK(id, data) {
@@ -39,14 +40,14 @@ function SDK(id, data) {
 						data = JSON.parse(fs.readFileSync(cacheFile));
 					}
 				}
-				configuration.credentials = new aws.STS().credentialsFrom(data, data);
+				configuration.credentials = aws.STS().credentialsFrom(data, data);
 			} else {
 				console.log("Switching AWS Profile", profile);
-				configuration.credentials = new aws.SharedIniFileCredentials(awsConfig);
+				configuration.credentials = aws.SharedIniFileCredentials(awsConfig);
 			}
 		} else {
 			console.log("Switching AWS Profile", awsConfig.profile);
-			configuration.credentials = new aws.SharedIniFileCredentials(awsConfig);
+			configuration.credentials = aws.SharedIniFileCredentials(awsConfig);
 		}
 	}
 
@@ -56,8 +57,8 @@ function SDK(id, data) {
 	}
 
 	let leoStream = ls(configuration);
-	return Object.assign((id, data) => {
-		return new SDK(id, data)
+	return Object.assign(async (id, data) => {
+		return await new SDK(id, data)
 	}, {
 		configuration: configuration,
 		destroy: (callback) => {
@@ -103,15 +104,15 @@ function SDK(id, data) {
 		read: leoStream.fromLeo,
 		write: leoStream.toLeo,
 		put: function(bot_id, queue, payload, opts, callback) {
-                        if (typeof opts == "function") {
-                                callback = opts;
-                                opts = {};
-                        }
-                        opts = Object.assign({
-                                kinesis: {
-                                        records: 1
-                                }
-                        }, opts || {});
+						if (typeof opts == "function") {
+								callback = opts;
+								opts = {};
+						}
+						opts = Object.assign({
+								kinesis: {
+										records: 1
+								}
+						}, opts || {});
 			let stream = this.load(bot_id, queue, opts);
 			stream.write(payload);
 			stream.end(callback);
@@ -124,9 +125,17 @@ function SDK(id, data) {
 			s3: leoStream.s3,
 			cloudformation: new aws.CloudFormation({
 				region: configuration.aws.region,
-				credentials: configuration.credentials
+				credentials: configuration.credentials,
+				httpOptions: {
+					agent: new https.Agent({
+						ciphers: 'ALL',
+						secureProtocol: 'TLSv1_3_method',
+						keepAlive: true
+					})
+				}
 			})
 		}
 	});
 }
-module.exports = new SDK(false);
+
+module.exports = SDK(false);
