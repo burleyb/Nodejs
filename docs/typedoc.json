@@ -1,0 +1,30 @@
+{
+    "entryPoints": [
+        "../index.d.ts",
+        "../lib/cron.d.ts",
+        "../lib/streams.d.ts",
+        "../lib/types.d.ts",
+        "../lib/dynamodb.d.ts",
+        "../lib/rstreams-config-provider-chain.ts",
+        "../lib/rstreams-configuration.ts"
+    ],
+    "out": "build",
+	"name": "RStreams Node SDK",
+	"includeVersion": true,
+    "gitRevision": "master",
+    "tsconfig": "../tsconfig.json",
+    "theme": "mydefault",
+    "excludeTags": [
+        "todo"
+    ],
+    "replaceText": {
+        "replacements": [
+            {
+                "pattern": "rstreams-site-url",
+                "replace": "https://rstreams.org"
+            }
+        ]
+    },
+    "defaultCategory": " ",
+    "categorizeByGroup": true
+}
