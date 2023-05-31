@@ -226,7 +226,7 @@ function callCheckpointOnResponses(leoBotCheckpoint, callback) {
 					logger.log("[queue]", queue);
 					let params = data[botId].read[queue];
 					params.type = "read";
-					logger.log("[params]", params);
+					//logger.log("[params]", params);
 					checkpointTasks.push((done) => {
 						logger.log(`---------------------- Executing read checkpoint against ${queue} ---------------`, params);
 						leoBotCheckpoint(botId, queue, params, done);
@@ -236,7 +236,7 @@ function callCheckpointOnResponses(leoBotCheckpoint, callback) {
 					logger.log("[queue]", queue);
 					let params = data[botId].write[queue];
 					params.type = "write";
-					logger.log("[params]", params);
+					//logger.log("[params]", params);
 					checkpointTasks.push((done) => {
 						logger.log(`---------------------- Executing write checkpoint against ${queue} ---------------`, params);
 						leoBotCheckpoint(botId, queue, params, done);
