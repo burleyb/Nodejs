@@ -29,7 +29,7 @@ module.exports = function (configOverride, botHandler) {
 		process.on('uncaughtException', function (err) {
 			console.error((new Date).toUTCString() + ' uncaughtException:', err.message);
 			console.error(err.stack);
-			callback({
+			callback(null, {
 				statusCode: 500,
 				'Content-Type': 'application/json',
 				body: JSON.stringify("Application Error")

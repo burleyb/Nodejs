@@ -415,7 +415,7 @@ function reduceCheckpoints(responses) {
 	if(vals && allReported) {
 		return Object.values(vals);
 	} else {
-		logger.log("----- not all have reported, cannot checkpoint unless all children have processes the same events -----")
+		logger.log("----- not all have reported, cannot checkpoint unless all children have processed the same events -----")
 		return [];
 	}
 }
