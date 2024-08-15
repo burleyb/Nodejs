@@ -14,6 +14,10 @@ const mockWrapper = require("./lib/mock-wrapper");
 const leologger = require("leo-logger")("sdk");
 
 function SDK(id, data, awsResourceConfig) {
+console.log("[data]", data)
+console.log("[awsResourceConfig]", awsResourceConfig)
+console.log("[id]", id)
+
 	if (typeof id !== "string" && id != null) {
 		awsResourceConfig = data;
 		data = id;
