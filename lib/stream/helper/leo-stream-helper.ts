@@ -568,7 +568,7 @@ export function createFastS3ReadHooks(settings: ReadHooksParams): ReadOptionHook
 		// 		}
 		// 	});
 		// },
-		createSplitParseStream(JSONparse, record) {
+		createSplitParseStream(_JSONparse, record) {
 			if ((record.s3 || record.s3Like) && settings.parallelParse) {
 				return new PassThrough({ objectMode: true }) as unknown as TransformStream<string, any>;
 			} else if (record.gzip && settings.parallelParse) {
@@ -578,7 +578,7 @@ export function createFastS3ReadHooks(settings: ReadHooksParams): ReadOptionHook
 				return null;
 			}
 		},
-		createS3Stream(streamRecord, index) {
+		createS3Stream(streamRecord, _index) {
 			let _parts = streamRecord.start.split(/-/);
 			let idOffset = parseInt(_parts[1]);
 			if (streamRecord.s3Like) {

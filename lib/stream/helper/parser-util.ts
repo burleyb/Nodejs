@@ -78,7 +78,7 @@ export enum ParserName {
 // Factory of parsers so that they can be created with any config needed
 export let parsers: Record<ParserName, (settings: any) => (input: string) => any> = {
 	[ParserName.JsonParse]: () => JSON.parse,
-	[ParserName.Empty]: () => (input: string) => {
+	[ParserName.Empty]: () => (_input: string) => {
 		return {
 			id: "unknown",
 			payload: {}
@@ -136,7 +136,7 @@ export let parsers: Record<ParserName, (settings: any) => (input: string) => any
 		};
 
 		const ARRAY_TYPE = 1;
-		function set(field, value, suffix = "") {
+		function set(_field, value, suffix = "") {
 			let keys = fastJson.getPath();
 			let last = keys.pop();
 			// Detect if this is an array and use [] instead of {}
