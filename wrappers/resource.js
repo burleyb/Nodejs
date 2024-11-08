@@ -39,7 +39,16 @@ module.exports = function (configOverride, botHandler) {
 			if (event.isBase64Encoded) {
 				event.body = Buffer.from(event.body, 'base64');
 			} else if (event.body && typeof event.body !== "object") {
-				event.body = JSON.parse(event.body);
+				try {
+					event.body = JSON.parse(event.body);
+				} catch (err) {
+					console.error("===error parsing input body===", err)
+					callback(null, {
+						statusCode: 500,
+						'Content-Type': 'application/json',
+						body: JSON.stringify("Application Error")
+					});					
+				}
 			}
 			event.params = {
 				path: event.pathParameters || {},

@@ -13,7 +13,7 @@ import stream from 'stream';
 
 export interface ReadableQueueStream<T> extends ReadableStream<ReadEvent<T>> {
 	get(): Checkpoint;
-	getOpts(): ReadOptions<T>;
+	getOpts?: () => ReadOptions<T>;
 	checkpoint(params: Checkpoint, done: Callback): void;
 	checkpoint(done: Callback): void;
 }
