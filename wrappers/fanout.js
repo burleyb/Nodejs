@@ -1,4 +1,4 @@
-const aws = require("aws-sdk");
+const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
 const async = require("async");
 const eventIdFormat = "[z/]YYYY/MM/DD/HH/mm/";
 const moment = require("moment");
@@ -185,12 +185,12 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 						const handlerResponse = handler(event, context, handlerCallback);
 						if (handlerResponse && typeof handlerResponse.then === 'function') {
 							handlerResponse
-							.then(
-								data => handlerCallback(null, data)
-							)
-							.catch(
-								err=> handlerCallback(err)
-							);
+								.then(
+									data => handlerCallback(null, data)
+								)
+								.catch(
+									err => handlerCallback(err)
+								);
 						}
 						return handlerResponse;
 					}, 200);
@@ -203,13 +203,13 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			// Wait for all workers to return and figure out what checkpoint to persist
 			logger.debug(`Waiting on all Fanout workers: count ${workers.length}`);
 			Promise.all(workers)
-			.then(
-				callCheckpointOnResponses(leoBotCheckpoint, callback)
-			)
-			.catch((err) => { 
-				logger.error("[err in promise all]", err);
-				return callback(err);
-			});
+				.then(
+					callCheckpointOnResponses(leoBotCheckpoint, callback)
+				)
+				.catch((err) => { 
+					logger.error("[err in promise all]", err);
+					return callback(err);
+				});
 		}
 	};
 };
@@ -264,7 +264,7 @@ function callCheckpointOnResponses(leoBotCheckpoint, callback) {
  * @param {*} context Lambda context object
  * @param {function(BotEvent, LambdaContext, Callback)} handler
  */
-function invokeSelf(event, iid, count, context) {
+async function invokeSelf(event, iid, count, context) {
 	let newEvent = {
 		__cron: {
 			iid,
@@ -273,50 +273,73 @@ function invokeSelf(event, iid, count, context) {
 		}
 	};
 	try {
-		logger.log(`Invoking ${iid+1}/${count}`);
+		logger.log(`Invoking ${iid + 1}/${count}`);
 		newEvent = Object.assign(JSON.parse(JSON.stringify(event)), newEvent);
 	} catch (err) {
 		return Promise.reject(err);
 	}
-	return new Promise((resolve, reject) => {
+	return new Promise(async (resolve, reject) => {
 		if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
 			try {
-				let lambdaApi = new aws.Lambda({
+				const lambdaClient = new LambdaClient({
 					region: process.env.AWS_DEFAULT_REGION,
-					httpOptions: {
-						timeout: context.getRemainingTimeInMillis() // Default: 120000 // Two minutes
-					}
+					requestHandler: {
+						handle: async (request) => {
+							const timeout = context.getRemainingTimeInMillis();
+							return new Promise((resolve, reject) => {
+								const controller = new AbortController();
+								const timeoutId = setTimeout(() => controller.abort(), timeout);
+								request.signal = controller.signal;
+
+								fetch(request)
+									.then((response) => {
+										clearTimeout(timeoutId);
+										resolve(response);
+									})
+									.catch((error) => {
+										clearTimeout(timeoutId);
+										reject(error);
+									});
+							});
+						},
+					},
 				});
+
 				logger.log("[lambda]", process.env.AWS_LAMBDA_FUNCTION_NAME);
-				const lambdaInvocation = lambdaApi.invoke({
+
+				const params = {
 					FunctionName: process.env.AWS_LAMBDA_FUNCTION_NAME,
 					InvocationType: 'RequestResponse',
-					Payload: JSON.stringify(newEvent),
-					Qualifier: process.env.AWS_LAMBDA_FUNCTION_VERSION
-				}, (err, data) => {
-					logger.log(`Done with Lambda instance ${iid+1}/${count}`);
-					try {
-						logger.log("[lambda err]", err);
-						logger.log("[lambda data]", data);
-						if (err) {
-							return reject(err);
-						} else if (!err && data.FunctionError) {
-							err = data.Payload;
-							return reject(err);
-						} else if (!err && data.Payload != undefined && data.Payload != 'null') {
-							data = JSON.parse(data.Payload);
-						} else {
-							logger.log("------- unexpected response from child lambda ------", data)
-						}
-		
-						resolve(data);
-					} catch (err) {
-						reject(err);
+					Payload: Buffer.from(JSON.stringify(newEvent)),
+					Qualifier: process.env.AWS_LAMBDA_FUNCTION_VERSION,
+				};
+
+				const command = new InvokeCommand(params);
+
+				const data = await lambdaClient.send(command);
+
+				logger.log(`Done with Lambda instance ${iid + 1}/${count}`);
+
+				try {
+					logger.log("[lambda data]", data);
+
+					if (data.FunctionError) {
+						throw new Error(data.Payload);
 					}
-				});
-				logger.debug("[lambda invoked invocation/payload]", lambdaInvocation, JSON.stringify(newEvent, null, 2));
+
+					if (data.Payload && data.Payload !== 'null') {
+						const parsedData = JSON.parse(Buffer.from(data.Payload).toString());
+						resolve(parsedData);
+					} else {
+						logger.log("------- unexpected response from child lambda ------", data);
+					}
+				} catch (err) {
+					logger.log("[lambda err]", err);
+					throw err;
+				}
 			} catch (err) {
-				reject(err);
+				logger.log("[lambda err]", err);
+				throw err;
 			}
 		} else {
 			try {
@@ -362,11 +385,11 @@ function reduceCheckpoints(responses) {
 		if (curr && curr.error) {
 			agg.errors.push(curr.error);
 		}
-		if(curr && curr.checkpoints) {
-			if(Object.keys(curr.checkpoints).length) {
+		if (curr && curr.checkpoints) {
+			if (Object.keys(curr.checkpoints).length) {
 				Object.keys(curr.checkpoints).map(botId => {
-					if(!agg.checkpoints) {
-						
+					if (!agg.checkpoints) {
+
 					} else if (!(botId in agg.checkpoints)) {
 						agg.checkpoints[botId] = curr.checkpoints[botId];
 						Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
@@ -393,7 +416,7 @@ function reduceCheckpoints(responses) {
 							}
 						});
 					}
-					
+
 				});
 			} else {
 				allReported = false
@@ -411,8 +434,8 @@ function reduceCheckpoints(responses) {
 		delete checkpoints.errors;
 	}
 	let vals = Object.values(checkpoints);
-	
-	if(vals && allReported) {
+
+	if (vals && allReported) {
 		return Object.values(vals);
 	} else {
 		logger.log("----- not all have reported, cannot checkpoint unless all children have processed the same events -----")
