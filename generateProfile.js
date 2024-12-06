@@ -3,7 +3,6 @@ let homeDir = require('os').homedir();
 let path = require("path");
 let fs = require("fs");
 let extend = require("extend");
-var aws = require("./lib/leo-aws");
 var async = require('async');
 var crypto = require("crypto");
 var moment = require("moment");
