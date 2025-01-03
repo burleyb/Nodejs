@@ -282,27 +282,7 @@ async function invokeSelf(event, iid, count, context) {
 		if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
 			try {
 				const lambdaClient = new LambdaClient({
-					region: process.env.AWS_DEFAULT_REGION,
-					requestHandler: {
-						handle: async (request) => {
-							const timeout = context.getRemainingTimeInMillis();
-							return new Promise((resolve, reject) => {
-								const controller = new AbortController();
-								const timeoutId = setTimeout(() => controller.abort(), timeout);
-								request.signal = controller.signal;
-
-								fetch(request)
-									.then((response) => {
-										clearTimeout(timeoutId);
-										resolve(response);
-									})
-									.catch((error) => {
-										clearTimeout(timeoutId);
-										reject(error);
-									});
-							});
-						},
-					},
+					region: process.env.AWS_DEFAULT_REGION
 				});
 
 				logger.log("[lambda]", process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -313,6 +293,8 @@ async function invokeSelf(event, iid, count, context) {
 					Payload: Buffer.from(JSON.stringify(newEvent)),
 					Qualifier: process.env.AWS_LAMBDA_FUNCTION_VERSION,
 				};
+				
+				logger.log("[params]", params);
 
 				const command = new InvokeCommand(params);
 
