@@ -212,7 +212,34 @@ export interface WriteOptions extends BaseWriteOptions {
 	 */
 	onCheckpoint?: (data: { error?: any, checkpoints: Record<string, Record<string, string>> }) => Promise<void> | void;
 }
-
+interface PromiseResolver<T> extends Promise<T> {
+	resolve: () => void;
+	reject: (err?: any) => void;
+}
+interface LocalFileStreamRecordS3 {
+	bucket: string;
+	key: string;
+	start: string;
+	end: string;
+	gzipSize: number;
+	writeStartEid: boolean;
+}
+interface LocalFileStreamRecord extends StreamRecord {
+	s3Like?: boolean;
+	filePrefix?: string;
+	localFile?: {
+		id: number;
+		filePath: string;
+		readyPromise: PromiseResolver<void>;
+		unlinkOnStreamClose?: string[]
+		data?: any;
+	},
+	gzip?: string;
+	s3?: LocalFileStreamRecordS3 | LocalFileStreamRecordS3[];
+	offsets?: any[];
+	s3Parts?: LocalFileStreamRecord[];
+	mergeS3GzipSize?: number;
+}
 
 export interface StreamRecord {
 	records: number;

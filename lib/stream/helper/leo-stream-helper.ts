@@ -226,7 +226,7 @@ interface LocalFileStreamRecordS3 {
 interface LocalFileStreamRecord extends StreamRecord {
 	s3Like?: boolean;
 	filePrefix?: string;
-	localFile: {
+	localFile?: {
 		id: number;
 		filePath: string;
 		readyPromise: PromiseResolver<void>;
@@ -889,7 +889,7 @@ export function determineReadHooks<T>(settings: ReadOptions<T>, partialHookSetti
 		parseTaskParser,
 	};
 
-	let readOpts: ReadOptions<T> & { _hookSettings: ReadHooksParams } = {
+	let readOpts: ReadOptions<T> & { _hookSettings: ReadHooksParams|LocalFileStreamRecord } = {
 		hooks: createFastS3ReadHooks(hookSettings),
 		_hookSettings: hookSettings
 	};
