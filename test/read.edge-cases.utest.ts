@@ -2,8 +2,6 @@ import RStreamsSdk, { ReadEvent } from "../index";
 import sinon from "sinon";
 import chai, { expect, assert } from "chai";
 import sinonchai from "sinon-chai";
-import { Credentials } from "@aws-sdk/types";
-import { KinesisClient, Kinesis } from "@aws-sdk/client-kinesis";
 import { gzipSync, gunzipSync } from "zlib";
 import streams from "../lib/streams";
 import fs, { WriteStream } from "fs";

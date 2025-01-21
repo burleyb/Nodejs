@@ -1,4 +1,5 @@
-const { LambdaClient, InvokeCommand } = require("@aws-sdk/client-lambda");
+
+const { Lambda } = require("@aws-sdk/client-lambda");
 const async = require("async");
 const eventIdFormat = "[z/]YYYY/MM/DD/HH/mm/";
 const moment = require("moment");
@@ -148,7 +149,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 			};
 			const handlerResponse = handler(event, context, handlerCallback);
 			if (handlerResponse && typeof handlerResponse.then === 'function') {
-				handlerResponse.then(data => handlerCallback(null, data)).catch(err=> handlerCallback(err));
+				handlerResponse.then(data => handlerCallback(null, data)).catch(err => handlerCallback(err));
 			}
 			return handlerResponse;
 		} else {
@@ -167,7 +168,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 				new Promise(resolve => {
 					setTimeout(() => {
 						logger.log(`Invoking 1/${instances}`);
-						let wasCalled = false; 
+						let wasCalled = false;
 						const handlerCallback = (err, data) => {
 							if (!wasCalled) {
 								wasCalled = true;
@@ -184,13 +185,7 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 						};
 						const handlerResponse = handler(event, context, handlerCallback);
 						if (handlerResponse && typeof handlerResponse.then === 'function') {
-							handlerResponse
-								.then(
-									data => handlerCallback(null, data)
-								)
-								.catch(
-									err => handlerCallback(err)
-								);
+							handlerResponse.then((data) => handlerCallback(null, data)).catch(err => handlerCallback(err));
 						}
 						return handlerResponse;
 					}, 200);
@@ -202,20 +197,16 @@ const fanoutFactory = (handler, eventPartition, opts = {}) => {
 
 			// Wait for all workers to return and figure out what checkpoint to persist
 			logger.debug(`Waiting on all Fanout workers: count ${workers.length}`);
-			Promise.all(workers)
-				.then(
-					callCheckpointOnResponses(leoBotCheckpoint, callback)
-				)
-				.catch((err) => { 
-					logger.error("[err in promise all]", err);
-					return callback(err);
-				});
+			Promise.all(workers).then(callCheckpointOnResponses(leoBotCheckpoint, callback)).catch((err) => {
+				logger.error("[err]", err);
+				return callback(err);
+			});
 		}
 	};
 };
 
-function callCheckpointOnResponses(leoBotCheckpoint, callback) { 
-	return function (responses) {
+function callCheckpointOnResponses(leoBotCheckpoint, callback) {
+	return function(responses) {
 		logger.log("Return from all workers, reducing checkpoints");
 		let checkpoints = reduceCheckpoints(responses).map((data) => {
 			logger.log("[data]", data);
@@ -246,7 +237,7 @@ function callCheckpointOnResponses(leoBotCheckpoint, callback) {
 			});
 		});
 		logger.log("[promise all checkpoints]", checkpoints);
-		if(checkpoints && checkpoints[0] && checkpoints[0][0] && checkpoints[0][0].length) {
+		if (checkpoints && checkpoints[0] && checkpoints[0][0] && checkpoints[0][0].length) {
 			logger.log("---- calling checkpoints ----");
 			async.parallelLimit(checkpoints[0][0], 5, callback);
 		} else {
@@ -281,8 +272,11 @@ async function invokeSelf(event, iid, count, context) {
 	return new Promise(async (resolve, reject) => {
 		if (process.env.AWS_LAMBDA_FUNCTION_NAME) {
 			try {
-				const lambdaClient = new LambdaClient({
-					region: process.env.AWS_DEFAULT_REGION
+				let lambdaApi = new Lambda({
+					region: process.env.AWS_DEFAULT_REGION,
+					httpOptions: {
+						timeout: context.getRemainingTimeInMillis() // Default: 120000 // Two minutes
+					}
 				});
 
 				logger.log("[lambda]", process.env.AWS_LAMBDA_FUNCTION_NAME);
@@ -325,7 +319,7 @@ async function invokeSelf(event, iid, count, context) {
 			}
 		} else {
 			try {
-			// Fork process with event
+				// Fork process with event
 				let worker = require("child_process").fork(process.argv[1], process.argv.slice(2), {
 					cwd: process.cwd(),
 					env: Object.assign({}, process.env, {
@@ -335,16 +329,16 @@ async function invokeSelf(event, iid, count, context) {
 						runner_keep_cmd: true
 					}),
 					execArgv: process.execArgv,
-				//stdio: [s, s, s, 'ipc'],
-				//shell: true
+					//stdio: [s, s, s, 'ipc'],
+					//shell: true
 				});
 				let responseData = {};
 				worker.once("message", (response) => {
-					logger.log(`Got Response with instance ${iid+1}/${count}`);
+					logger.log(`Got Response with instance ${iid + 1}/${count}`);
 					responseData = response;
 				});
 				worker.once("exit", () => {
-					logger.log(`Done with child instance ${iid+1}/${count}`);
+					logger.log(`Done with child instance ${iid + 1}/${count}`);
 					logger.log("[responseData]", responseData);
 					resolve(responseData);
 				});
@@ -368,20 +362,21 @@ function reduceCheckpoints(responses) {
 			agg.errors.push(curr.error);
 		}
 		if (curr && curr.checkpoints) {
-			if (Object.keys(curr.checkpoints).length) {
-				Object.keys(curr.checkpoints).map(botId => {
-					if (!agg.checkpoints) {
-
-					} else if (!(botId in agg.checkpoints)) {
-						agg.checkpoints[botId] = curr.checkpoints[botId];
-						Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
-							agg.checkpoints[botId].read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
-							// agg.checkpoints[botId].read[queue].records = curr.checkpoints[botId].read[queue].records || 1;
-						});
-					} else {
-						let checkpointData = agg.checkpoints[botId].read;
-						Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
-							if (!(queue in checkpointData)) {
+			Object.keys(curr.checkpoints).map(botId => {
+				if (!(botId in agg.checkpoints)) {
+					agg.checkpoints[botId] = curr.checkpoints[botId];
+					Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
+						agg.checkpoints[botId].read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
+					});
+				} else {
+					let checkpointData = agg.checkpoints[botId].read;
+					Object.keys(curr.checkpoints[botId].read || {}).map(queue => {
+						if (!(queue in checkpointData)) {
+							checkpointData[queue] = curr.checkpoints[botId].read[queue];
+							checkpointData.read[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
+						} else {
+							let minCheckpoint = min(checkpointData[queue].checkpoint, curr.checkpoints[botId].read[queue].checkpoint);
+							if (minCheckpoint && minCheckpoint == curr.checkpoints[botId].read[queue].checkpoint) {
 								checkpointData[queue] = curr.checkpoints[botId].read[queue];
 								checkpointData[queue].eid = curr.checkpoints[botId].read[queue].checkpoint;
 								// checkpointData[queue].records += curr.checkpoints[botId].read[queue].records || 1;
@@ -396,13 +391,11 @@ function reduceCheckpoints(responses) {
 									// checkpointData[queue].records = curr_count
 								}
 							}
-						});
-					}
+						}
+					});
+				}
 
-				});
-			} else {
-				allReported = false
-			}
+			});
 		}
 		return agg;
 	}, {
@@ -410,14 +403,14 @@ function reduceCheckpoints(responses) {
 		checkpoints: {}
 	});
 	logger.log("[checkpoints]", JSON.stringify(checkpoints, null, 2));
-	if(checkpoints.errors && checkpoints.errors.length) {
+	if (checkpoints.errors && checkpoints.errors.length) {
 		throw new Error("errors from sub lambdas");
 	} else {
 		delete checkpoints.errors;
 	}
 	let vals = Object.values(checkpoints);
 
-	if (vals && allReported) {
+	if (vals) {
 		return Object.values(vals);
 	} else {
 		logger.log("----- not all have reported, cannot checkpoint unless all children have processed the same events -----")
