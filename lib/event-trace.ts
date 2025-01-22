@@ -274,7 +274,7 @@ function searchCorrelationId(sdk: RStreamsSdk, statsTableName: string, queue_id,
 	let ls = sdk.streams;
 
 	logger.debug("Search Correlation Id:", bot_id.refId());
-	dynamodb.docClient.query({
+	dynamodb.query({
 		TableName: statsTableName,
 		KeyConditionExpression: "#id = :id and #bucket >= :bucket",
 		ExpressionAttributeNames: {
@@ -287,11 +287,9 @@ function searchCorrelationId(sdk: RStreamsSdk, statsTableName: string, queue_id,
 			":id": bot_id.refId()
 		},
 		"ReturnConsumedCapacity": 'TOTAL'
-	}, (err, result) => {
-		if (err) {
-			callback(err);
-			return;
-		}
+	})
+	.then((result) => {
+	
 		let found = null;
 		let source = util.ref(correlation.source).queue().refId();
 		for (let i = 0; i < result.Items.length; i++) {
@@ -306,7 +304,7 @@ function searchCorrelationId(sdk: RStreamsSdk, statsTableName: string, queue_id,
 			return callback();
 		}
 		let timestamp = moment(found.time);
-		dynamodb.docClient.query({
+		dynamodb.query({
 			TableName: statsTableName,
 			KeyConditionExpression: "#id = :id and #bucket >= :bucket",
 			ExpressionAttributeNames: {
@@ -319,10 +317,8 @@ function searchCorrelationId(sdk: RStreamsSdk, statsTableName: string, queue_id,
 				":id": bot_id.refId()
 			},
 			"ReturnConsumedCapacity": 'TOTAL'
-		}, (err, result) => {
-			if (err) {
-				return callback(err);
-			}
+		})
+		.then((result) => {
 			let found = null;
 			for (let i = 0; i < result.Items.length; i++) {
 				let stat = result.Items[i];
@@ -369,7 +365,14 @@ function searchCorrelationId(sdk: RStreamsSdk, statsTableName: string, queue_id,
 				}), (err) => {
 					callback(err, found);
 				});
+		})
+		.catch(err => {
+			return callback(err);
 		});
+	})
+	.catch(err => {
+		callback(err);
+		return;
 	});
 
 }

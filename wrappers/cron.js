@@ -169,7 +169,7 @@ module.exports = function(configOverride, botHandler) {
 				} else {
 					try {
 						cmdLogger.log("[LEOCRON]:start:" + cronkey);
-						fill(event || {}, config, dynamodb.docClient).then(filledEvent => {
+						fill(event || {}, config, dynamodb).then(filledEvent => {
 							let promise = botHandler(filledEvent, context, function(err, data) {
 								cmdLogger.log("[LEOCRON]:complete:" + cronkey);
 								cron.reportComplete(event.__cron, context.awsRequestId, err ? "error" : "complete", err ? err : '', {}, function(err2, data2) {
@@ -226,7 +226,7 @@ module.exports = function(configOverride, botHandler) {
 				} else {
 					try {
 						logger.log("running");
-						fill(event || {}, config, dynamodb.docClient).then(filledEvent => {
+						fill(event || {}, config, dynamodb).then(filledEvent => {
 							botHandler(filledEvent, context, function(err, data) {
 								logger.log("removing lock", config.name, context.awsRequestId);
 								cron.removeLock(config.name, context.awsRequestId, function(err2, data2) {
