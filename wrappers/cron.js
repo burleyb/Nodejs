@@ -171,6 +171,7 @@ module.exports = function(configOverride, botHandler) {
 						cmdLogger.log("[LEOCRON]:start:" + cronkey);
 						fill(event || {}, config, dynamodb).then(filledEvent => {
 							let promise = botHandler(filledEvent, context, function(err, data) {
+								logger.log("[cron.js", err, data);
 								cmdLogger.log("[LEOCRON]:complete:" + cronkey);
 								cron.reportComplete(event.__cron, context.awsRequestId, err ? "error" : "complete", err ? err : '', {}, function(err2, data2) {
 									if (err || err2) {
@@ -181,6 +182,7 @@ module.exports = function(configOverride, botHandler) {
 							});
 							if (promise && typeof promise.then == "function" && botHandler.length < 3) {
 								promise.then(data => {
+									logger.log("[cron.js2", data);
 									cmdLogger.log("[LEOCRON]:complete:" + cronkey);
 									cron.reportComplete(event.__cron, context.awsRequestId, err ? "error" : "complete", err ? err : '', {}, function(err2, data2) {
 										if (err || err2) {
@@ -192,6 +194,7 @@ module.exports = function(configOverride, botHandler) {
 							}
 							if (promise && typeof promise.catch == "function") {
 								promise.catch(err => {
+									logger.log("[cron.js3", err);
 									cmdLogger.log("[LEOCRON]:complete:" + cronkey);
 									cron.reportComplete(event.__cron, context.awsRequestId, "error", err, {}, function() {
 										callback(null, err);
@@ -200,6 +203,7 @@ module.exports = function(configOverride, botHandler) {
 							}
 						}).catch(err => {
 							cron.reportComplete(event.__cron, context.awsRequestId, "error", err, {}, function() {
+								logger.log("[cron.js4", err);
 								callback(null, err);
 							});
 						});
@@ -209,6 +213,7 @@ module.exports = function(configOverride, botHandler) {
 							msg: e.message,
 							stack: e.stack
 						}, {}, function() {
+							logger.log("[cron.js5", e);
 							callback(null, e);
 						});
 					}
