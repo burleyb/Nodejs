@@ -21,7 +21,7 @@ module.exports = function (data) {
 	}
 
 	if (!data.region) {
-		data.region = aws.region || 'us-west-2';
+		data.region = aws.region || 'us-east-1';
 	}
 
 	if (data.region && !aws.region) {
